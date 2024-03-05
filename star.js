@@ -1,24 +1,28 @@
 const { createCanvas } = require('canvas');
 const GIFEncoder = require('gifencoder');
 const fs = require('fs');
-const WIDTH = 800
-const HEIGHT = 800
-const canvas = createCanvas(WIDTH, HEIGHT);
-let ctx = canvas.getContext('2d');
-let encoder = new GIFEncoder(WIDTH, HEIGHT);
-const path = require('path');
+const canvas = createCanvas(800, 600);
+const ctx = canvas.getContext('2d');
+
+const encoder = new GIFEncoder(800, 600);
+encoder.start();
+encoder.setRepeat(0); // 0 for repeat, -1 for no-repeat
+encoder.setDelay(100); // Frame delay in ms
+encoder.setQuality(10); // Image quality. 1 - 20
 
 // Constants for the manipulator's geometry
-const thetaShoulderMax = 360;
-const thetaShoulderMin = -360;
+const thetaShoulderMax = 90;
+const thetaShoulderMin = -90;
 const ShoulderLength = 195;
 
 const thetaElbowMax = 145;
 const thetaElbowMin = -145;
 const ElbowLength = 200;
 
+let thetaShoulder = 0;
+let thetaElbow = 145;
+
 function calculateInverseKinematics(x, y) {
-    y =y * 1.5
     let L1 = ShoulderLength;
     let L2 = ElbowLength;
     const D = (x ** 2 + y ** 2 - L1 ** 2 - L2 ** 2) / (2 * L1 * L2);
@@ -58,11 +62,11 @@ function calculateInverseKinematics(x, y) {
 
     return [theta1, theta2];
 }
-let lastPosition = null;
+
 let points = []
 function drawSCARAArm(targetX, targetY, penDown) {
     // Calculate the angles for shoulder and elbow to reach the target
-    const [theta1, theta2] = calculateInverseKinematics(targetX - (WIDTH/2), targetY - (HEIGHT/2));
+    const [theta1, theta2] = calculateInverseKinematics(targetX - 400, targetY - 300);
     if (theta1 === null || theta2 === null) {
         console.log("Target is not reachable.");
         return; // Target is not reachable
@@ -73,18 +77,17 @@ function drawSCARAArm(targetX, targetY, penDown) {
     const theta2Rad = theta2 * (Math.PI / 180);
 
     // Calculate elbow position
-    const elbowX = (WIDTH/2) + ShoulderLength * Math.cos(theta1Rad);
-    const elbowY = (HEIGHT/2) + ShoulderLength * Math.sin(theta1Rad);
+    const elbowX = 400 + ShoulderLength * Math.cos(theta1Rad);
+    const elbowY = 300 + ShoulderLength * Math.sin(theta1Rad);
 
     // Calculate hand (end effector) position using elbow as the origin
     const handX = elbowX + ElbowLength * Math.cos(theta1Rad + theta2Rad);
     const handY = elbowY + ElbowLength * Math.sin(theta1Rad + theta2Rad);
-    ctx.clearRect(0, 0, WIDTH, HEIGHT)
 
-        // Drawing the arm
-
+    // Drawing the arm
+    ctx.clearRect(0,0,800,600)
     ctx.beginPath();
-    ctx.moveTo((WIDTH/2), (HEIGHT/2)); // Start from the shoulder position
+    ctx.moveTo(400, 300); // Start from the shoulder position
     ctx.lineTo(elbowX, elbowY); // Draw to elbow
     ctx.fillStyle = 'black';
     ctx.strokeStyle = 'green'; // Color of the arm
@@ -99,26 +102,14 @@ function drawSCARAArm(targetX, targetY, penDown) {
     ctx.lineWidth = 2; // Line width of the arm
     ctx.stroke();
 
-    if (penDown && lastPosition) {
-        // Store the line segment as an object with start and end points
-        points.push({
-            start: { x: lastPosition.x, y: lastPosition.y },
-            end: { x: handX, y: handY }
-        });
-    }
-
-    // Update last position
-    lastPosition = { x: handX, y: handY };
-
-    // Draw stored line segments
     ctx.beginPath();
-    for (const segment of points) {
-        ctx.moveTo(segment.start.x, segment.start.y);
-        ctx.lineTo(segment.end.x, segment.end.y);
-    }
+    points.push([handX, handY])
     ctx.strokeStyle = 'red';
-    ctx.stroke();
+    for(let point of points){
+        ctx.ellipse(point[0], point[1], 1, 1, 0 ,0, 0);
 
+    }
+    ctx.stroke();
 }
 
 function interpolatePoints(x1, y1, x2, y2, steps) {
@@ -130,116 +121,70 @@ function interpolatePoints(x1, y1, x2, y2, steps) {
     }
     return points;
 }
-let last_skipped = false
+
 async function animateArmMovement(startX, startY, endX, endY) {
-    const points = interpolatePoints(startX, startY, endX, endY, 30);
-    let shouldDraw
-    if(last_skipped){
-       shouldDraw = true
-       last_skipped = false
-    }else{
-        shouldDraw = Math.random() > 0.75
-        last_skipped = true
-    }
+    const points = interpolatePoints(startX, startY, endX, endY, 20);
     for (const point of points) {
-        drawSCARAArm(point.x, point.y, shouldDraw);
+        drawSCARAArm(point.x, point.y, true);
         encoder.addFrame(ctx);
     }
 }
 
-function isPointReachable(x, y) {
-    const [theta1, theta2] = calculateInverseKinematics(x - (WIDTH/2), y - (HEIGHT/2));
-    return theta1 !== null && theta2 !== null;
-}
+// Draw text inside square
+const squareCorners = [{'x': 633.3333333333334, 'y': 195.95598854801193},
+    {'x': 654.1146802222061, 'y': 238.06359652578246},
+    {'x': 700.5831845297291, 'y': 244.81586544422564},
+    {'x': 666.9582589315312, 'y': 277.5920672778872},
+    {'x': 674.8960271110788, 'y': 323.87280694843514},
+    {'x': 633.3333333333334, 'y': 302.02200572599406},
+    {'x': 591.770639555588, 'y': 323.87280694843514},
+    {'x': 599.7084077351356, 'y': 277.5920672778872},
+    {'x': 566.0834821369376, 'y': 244.81586544422564},
+    {'x': 612.5519864444607, 'y': 238.0635965257825},
+    {'x': 633.3333333333334, 'y': 195.95598854801193}]
 
+// TODO generate random lines and save gif in folder with monotonic names.
+
+const path = require('path');
 
 // Function to generate a random point within canvas bounds
-function getRandomPointWithinReach(maxWidth, maxHeight) {
-    // Adjust center to target the top right quadrant more specifically
-    const centerX = maxWidth * 0.65; // Move the center towards the right side of the canvas
-    const centerY = maxHeight * 0.35; // Move the center upwards
-
-    const maxReach = ShoulderLength + ElbowLength - 10; // Slight buffer to ensure reachability
-
-    // Generate a random angle for Quadrant 1 (top right)
-    // This will focus on generating points in the desired quadrant
-    const angle = Math.random() * Math.PI / 2; // Random angle in radians, focusing on 0 to π/2
-
-    // Random radius within reach, ensuring it's positive
-    const radius = Math.random() * maxReach;
-
-    // Calculate x and y based on angle and radius
-    // Ensure they fall within the specified quadrant by adjusting the radius and angle calculation
-    const x = centerX + radius * Math.cos(angle);
-    const y = centerY - radius * Math.sin(angle); // Subtract because the y-axis is inverted
-
-    return { x, y };
+function getRandomPoint(maxWidth, maxHeight) {
+    return {
+        x: Math.random() * maxWidth,
+        y: Math.random() * maxHeight,
+    };
 }
 
+// Generate random lines and animate
 async function animateRandomLines(numberOfLines) {
-    let startPoint = getRandomPointWithinReach(WIDTH, HEIGHT); // Initial start point
-
-    // Ensure the initial start point is reachable; if not, try again until a reachable point is found
-    while (!isPointReachable(startPoint.x, startPoint.y)) {
-        startPoint = getRandomPointWithinReach(WIDTH, HEIGHT);
-    }
-
-    let endPoint;
     for (let i = 0; i < numberOfLines; i++) {
-        do {
-            endPoint = getRandomPointWithinReach(WIDTH, HEIGHT);
-        } while (!isPointReachable(endPoint.x, endPoint.y)); // Keep looking for a reachable endPoint
-
-        // Before drawing a new line, lift the pen and move to the start position without drawing
-        drawSCARAArm(startPoint.x, startPoint.y, false); // Move without drawing
-        encoder.addFrame(ctx);
-
-        // Now draw to the end point
-        console.log(`Moving from (${startPoint.x}, ${startPoint.y}) to (${endPoint.x}, ${endPoint.y})`);
+        const startPoint = getRandomPoint(800, 600);
+        const endPoint = getRandomPoint(800, 600);
         await animateArmMovement(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
-
-        // Update startPoint for the next line to start from the previous end point
-        startPoint = endPoint;
     }
-
-    return true;
 }
-
-
-
 
 // Function to save GIF with a monotonic name
 function saveGIF(buffer) {
-    const dir = path.join(__dirname, 'generated_gifs');
-    if (!fs.existsSync(dir)){
-        fs.mkdirSync(dir);
-    }
+    // Generate a monotonic name using the current timestamp
     const filename = `scara_drawing_${Date.now()}.gif`;
-    const filepath = path.join(dir, filename);
+    const filepath = path.join(__dirname, 'generated_gifs', filename);
     fs.writeFileSync(filepath, buffer, 'binary');
     console.log(`Animation completed and saved as ${filename}`);
 }
 
-
 // Example usage
 async function main() {
-    points = []
-    ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,WIDTH, HEIGHT)
-    encoder = new GIFEncoder(WIDTH, HEIGHT);
     encoder.start();
     encoder.setRepeat(0);
     encoder.setDelay(100);
     encoder.setQuality(10);
 
-    let result = await animateRandomLines(Math.floor(Math.random() * 16) + 3);
-    if(result === true) {
-        encoder.finish();
-        const buffer = encoder.out.getData();
-        saveGIF(buffer);
-    }
+    await animateRandomLines(5); // Example: Generate and animate 5 random lines
 
-    await main()
+    encoder.finish();
+    const buffer = encoder.out.getData();
+    saveGIF(buffer); // Save the GIF with a monotonic name
 }
 
 main();
