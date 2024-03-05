@@ -13,11 +13,11 @@ encoder.setQuality(10); // Image quality. 1 - 20
 // Constants for the manipulator's geometry
 const thetaShoulderMax = 90;
 const thetaShoulderMin = -90;
-const ShoulderLength = 195;
+const ShoulderLength = 200;
 
 const thetaElbowMax = 145;
 const thetaElbowMin = -145;
-const ElbowLength = 200;
+const ElbowLength = 195;
 
 let thetaShoulder = 0;
 let thetaElbow = 145;
@@ -143,48 +143,15 @@ const squareCorners = [{'x': 633.3333333333334, 'y': 195.95598854801193},
     {'x': 612.5519864444607, 'y': 238.0635965257825},
     {'x': 633.3333333333334, 'y': 195.95598854801193}]
 
-// TODO generate random lines and save gif in folder with monotonic names.
-
-const path = require('path');
-
-// Function to generate a random point within canvas bounds
-function getRandomPoint(maxWidth, maxHeight) {
-    return {
-        x: Math.random() * maxWidth,
-        y: Math.random() * maxHeight,
-    };
-}
-
-// Generate random lines and animate
-async function animateRandomLines(numberOfLines) {
-    for (let i = 0; i < numberOfLines; i++) {
-        const startPoint = getRandomPoint(800, 600);
-        const endPoint = getRandomPoint(800, 600);
-        await animateArmMovement(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+async function animateSquare() {
+    for (let i = 0; i < squareCorners.length - 1; i++) {
+        await animateArmMovement(squareCorners[i].x, squareCorners[i].y, squareCorners[i + 1].x, squareCorners[i + 1].y);
     }
-}
-
-// Function to save GIF with a monotonic name
-function saveGIF(buffer) {
-    // Generate a monotonic name using the current timestamp
-    const filename = `scara_drawing_${Date.now()}.gif`;
-    const filepath = path.join(__dirname, 'generated_gifs', filename);
-    fs.writeFileSync(filepath, buffer, 'binary');
-    console.log(`Animation completed and saved as ${filename}`);
-}
-
-// Example usage
-async function main() {
-    encoder.start();
-    encoder.setRepeat(0);
-    encoder.setDelay(100);
-    encoder.setQuality(10);
-
-    await animateRandomLines(5); // Example: Generate and animate 5 random lines
-
     encoder.finish();
     const buffer = encoder.out.getData();
-    saveGIF(buffer); // Save the GIF with a monotonic name
+    fs.writeFileSync('scara_star.gif', buffer, 'binary');
 }
 
-main();
+animateSquare();
+
+
